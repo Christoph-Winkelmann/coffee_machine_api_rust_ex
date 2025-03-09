@@ -3,96 +3,156 @@ Purpose:
     An API for a simple coffe machine.
     It should:
     - have a variable to measure coffee beans and water level
-    - Provide a function to make a cup of coffee, using beans and water
-    - Check after each cup, if there are enough beans and water for the next cup
-    - provide warnings and messages for certain situations
-    - provide functions for refilling supplies (beans, water)
+    - Provide a function to make a cup of coffee, consuming beans and water
+    - Check if there are enough beans and water for the next cup
+    - Provide warnings and messages for certain situations
+    - Provide a function for refilling supplies (beans, water)
+
+Updated Context:
+    - Restructuring the old code using what I have learned from the Rust Book
+        Chapters 4 - 6 (https://rust-book.cs.brown.edu/)
+
+Addendum (After finishing this version of the code):
+    - This is more verbose than the old version
+    - But it works very well while relying on less loose variables
+    - I didnt spend any thoughts on accesability modifiers (public and private) as
+        that is a lesson in Rust that I havent dealt with yet.
 */
 
 use std::io;
 
-const BEANS_MAX: u32 = 100;
-const WATER_MAX: u32 = 1_250;
+struct CoffeeMachine {
+    beans_max: u32,
+    water_max: u32,
+    curr_beans: u32,
+    curr_water: u32,
+    status: Status,
+}
 
-fn main() {
-    let mut running: bool = true;
-    let mut beans_state = BEANS_MAX;
-    let mut water_state = WATER_MAX;
+impl CoffeeMachine {
+    fn refill(&mut self) {
+        self.curr_beans = self.beans_max;
+        self.curr_water = self.water_max;
+    }
 
-    while running {
-        let needs_beans: bool = if beans_state < 15 { true } else { false };
-        let needs_water: bool = if water_state < 240 { true } else { false };
-        let needs_refill: bool = needs_beans || needs_water;
-        // display beans and water level
-        println!("Beans: {beans_state} g\nWater: {water_state} ml\n");
+    fn make_coffee(&mut self) {
+        self.curr_beans -= 15;
+        self.curr_water -= 240;
+        println!("Here you go.");
+    }
 
-        // ask user for action
-        println!("What can I do for you?");
-        if needs_refill {
-            println!(
-                r"
-
-2. Refill
-3. Exit
-"
-            )
+    fn set_status(&mut self) {
+        if self.curr_beans < 15 || self.curr_water < 240 {
+            self.status = Status::NeedsRefill;
         } else {
-            println!(
-                r"
-1. Make Coffee
-2. Refill
-3. Exit
-"
-            );
-        }
-        // determine choice and call corresponding functions
-        let choice = get_input();
-        if choice == "1" {
-            if needs_beans {
-                println!("Not enough beans. Please refill the machine.");
-                continue;
-            }
-            if needs_water {
-                println!("Not enough water. Please refill the water tank.");
-                continue;
-            }
-            beans_state -= 15;
-            water_state -= 240;
-            println!("Here you go.");
-        } else if choice == "2" {
-            if needs_beans {
-                beans_state = BEANS_MAX;
-                println!("Refill successfull");
-                continue;
-            }
-            if needs_water {
-                water_state = WATER_MAX;
-                println!("Refill successfull");
-                continue;
-            }
-            println!("Refill not required.")
-        } else if choice == "3" {
-            running = false;
-        } else {
-            println!("Invalid input.");
-            continue;
+            self.status = Status::Operational;
         }
     }
-    println!("Good-bye...")
+
+    fn display_menu(&self) {
+        match self.status {
+            Status::Operational => {
+                let output = println!(
+                    r"
+    1. Make Coffee
+    2. Refill
+    3. Exit
+    ",
+                );
+                output
+            }
+            Status::NeedsRefill => {
+                let output = println!(
+                    r"
+
+    2. Refill
+    3. Exit
+    ",
+                );
+                output
+            }
+        }
+    }
+
+    fn display_fill_state(&self) {
+        println!(
+            "Beans: {} gramms | Water: {} milliliters",
+            self.curr_beans, self.curr_water
+        );
+    }
 }
+
+enum Status {
+    Operational,
+    NeedsRefill,
+}
+
+//////
+// Main Program
+/////
+
+fn main() {
+    let mut program_running: bool = true;
+
+    let mut coffee_machine1 = CoffeeMachine {
+        beans_max: 100,
+        water_max: 1_250,
+        curr_beans: 0,
+        curr_water: 0,
+        status: Status::NeedsRefill,
+    };
+
+    while program_running {
+        coffee_machine1.set_status();
+        coffee_machine1.display_fill_state();
+        coffee_machine1.display_menu();
+
+        // get input
+        let input = get_input();
+
+        // process input
+        match input {
+            1 => match coffee_machine1.status {
+                Status::NeedsRefill => invalid_input(),
+                Status::Operational => coffee_machine1.make_coffee(),
+            },
+            2 => coffee_machine1.refill(),
+            3 => program_running = false,
+            _ => (),
+        }
+    }
+    println!("Goodbye!")
+}
+
+//////
+//////
+//////
 
 // fn check_needs() -> String {}
 
-fn get_input() -> String {
+fn get_input() -> u8 {
     loop {
+        println!("Welcome, what can I do for you?");
         let mut input: String = String::new();
         io::stdin()
             .read_line(&mut input)
             .expect("Could not read line");
-        let input: String = match input.trim().parse() {
-            Ok(str) => str,
-            Err(_) => continue,
+        let input: u8 = match input.trim().parse() {
+            Ok(num) => num,
+            Err(_) => {
+                invalid_input();
+                continue;
+            }
         };
-        return input;
+        if input > 3 || input < 1 {
+            invalid_input();
+            continue;
+        } else {
+            return input;
+        }
     }
+}
+
+fn invalid_input() {
+    println!("Invalid input. Type the corresponding number.");
 }
